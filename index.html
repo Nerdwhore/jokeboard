@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>JokeBoard</title>
+<style>
+  :root{
+    --bg:#faf9f6; --card:#ffffff; --border:#e4e1d8; --border-strong:#c9c5b8;
+    --text:#1e1c16; --text-2:#6b6858; --text-muted:#9c988a;
+    --red-bg:#fdecea; --red-bd:#e3a29a; --red-tx:#8a2f22;
+    --yel-bg:#fdf4dc; --yel-bd:#e0c07a; --yel-tx:#7a5a0a;
+    --grn-bg:#e9f5ea; --grn-bd:#9dc9a0; --grn-tx:#1f5c26;
+    --accent:#3a5a8c; --accent-bg:#e8eefa;
+    --radius:12px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#17160f; --card:#211f18; --border:#3a3729; --border-strong:#4c4837;
+      --text:#f0ede2; --text-2:#b3ae9c; --text-muted:#847f6c;
+      --red-bg:#3a201c; --red-bd:#6e3830; --red-tx:#f0a99b;
+      --yel-bg:#3a3016; --yel-bd:#6e5824; --yel-tx:#e8c877;
+      --grn-bg:#1e3320; --grn-bd:#3d6b41; --grn-tx:#9bd49f;
+      --accent:#7fa3e0; --accent-bg:#1e2a3d;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;padding-bottom:80px;}
+  .app{max-width:640px;margin:0 auto;padding:0 12px;}
+  header{position:sticky;top:0;background:var(--bg);z-index:20;padding:14px 12px 10px;border-bottom:0.5px solid var(--border);}
+  h1{font-size:20px;font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .tabs{display:flex;gap:6px;margin-bottom:10px;}
+  .tab{flex:1;padding:8px 4px;text-align:center;font-size:13px;font-weight:500;border-radius:8px;border:0.5px solid var(--border);background:var(--card);color:var(--text-2);cursor:pointer;}
+  .tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .searchrow{display:flex;gap:6px;margin-bottom:8px;}
+  input[type=text],input[type=search],textarea,select{
+    font-family:inherit;font-size:14px;background:var(--card);color:var(--text);
+    border:0.5px solid var(--border);border-radius:8px;padding:9px 10px;width:100%;
+  }
+  textarea{resize:vertical;min-height:44px;}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px;}
+  .chip{font-size:12px;padding:5px 10px;border-radius:14px;border:0.5px solid var(--border);background:var(--card);color:var(--text-2);cursor:pointer;white-space:nowrap;}
+  .chip.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);}
+  main{padding:12px 12px 0;}
+  .fab{position:fixed;bottom:20px;right:20px;width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,0.25);cursor:pointer;z-index:30;}
+  .empty{text-align:center;color:var(--text-muted);padding:40px 20px;font-size:14px;}
+
+  .card{background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;}
+  .card-status-red{border-left:4px solid var(--red-bd);}
+  .card-status-yellow{border-left:4px solid var(--yel-bd);}
+  .card-status-green{border-left:4px solid var(--grn-bd);}
+  .card-head{padding:12px 12px 8px;display:flex;flex-direction:column;gap:8px;}
+  .premise-input{font-size:15px;font-weight:600;border:none;background:transparent;padding:2px 0;}
+  .card-meta-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .status-btns{display:flex;gap:4px;}
+  .status-dot{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--border);cursor:pointer;background:var(--card);}
+  .status-dot.red{background:var(--red-bd);} .status-dot.yellow{background:var(--yel-bd);} .status-dot.green{background:var(--grn-bd);}
+  .status-dot.selected{outline:2px solid var(--text);outline-offset:2px;}
+  .theme-input{flex:1;min-width:90px;font-size:12px;padding:5px 8px;}
+  .stage-flag{font-size:11px;padding:5px 8px;border-radius:14px;border:0.5px solid var(--border);cursor:pointer;color:var(--text-2);background:var(--card);white-space:nowrap;}
+  .stage-flag.on{background:#f3e6cf;border-color:#c9a24c;color:#7a5a0a;}
+  @media (prefers-color-scheme: dark){.stage-flag.on{background:#3a3016;border-color:#6e5824;color:#e8c877;}}
+
+  .section{padding:8px 12px;border-top:0.5px solid var(--border);}
+  .section-label{font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin-bottom:6px;}
+  .beat{display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;background:var(--bg);border-radius:8px;padding:6px;}
+  .beat textarea{flex:1;font-size:13px;min-height:36px;}
+  .beat-controls{display:flex;flex-direction:column;gap:3px;}
+  .icon-btn{width:26px;height:26px;border:0.5px solid var(--border);background:var(--card);border-radius:6px;color:var(--text-2);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+  .icon-btn:active{background:var(--border);}
+  .beat-type-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;}
+  .add-row{display:flex;gap:6px;margin-top:4px;}
+  .add-row button{flex:1;font-size:12px;padding:7px;border-radius:8px;border:1px dashed var(--border-strong);background:transparent;color:var(--text-2);cursor:pointer;}
+
+  .cutbin{}
+  .cutbin-item{font-size:12px;color:var(--text-2);background:var(--bg);border-radius:6px;padding:6px 8px;margin-bottom:5px;display:flex;justify-content:space-between;gap:6px;align-items:center;}
+  .cutbin-item span{flex:1;}
+
+  .perf-item{font-size:12px;background:var(--bg);border-radius:8px;padding:8px;margin-bottom:6px;}
+  .perf-item .row1{display:flex;justify-content:space-between;color:var(--text-2);margin-bottom:3px;}
+  .rating-badge{font-weight:600;padding:1px 7px;border-radius:10px;font-size:11px;}
+  .rating-killed{background:var(--grn-bg);color:var(--grn-tx);}
+  .rating-okay{background:var(--yel-bg);color:var(--yel-tx);}
+  .rating-died{background:var(--red-bg);color:var(--red-tx);}
+  .perf-form{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+  .perf-form .row{display:flex;gap:6px;}
+  .perf-form select,.perf-form input{font-size:12px;padding:7px 8px;}
+  .perf-form button{font-size:12px;padding:7px;border-radius:8px;border:0.5px solid var(--accent);background:var(--accent-bg);color:var(--accent);cursor:pointer;}
+
+  .card-footer{display:flex;gap:6px;padding:8px 12px;}
+  .card-footer button{flex:1;font-size:12px;padding:7px;border-radius:8px;border:0.5px solid var(--border);background:var(--card);color:var(--text-2);cursor:pointer;}
+  .card-footer button.danger{color:var(--red-tx);border-color:var(--red-bd);}
+
+  .error{color:var(--red-tx);font-size:12px;margin-top:2px;}
+
+  /* modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:flex-end;justify-content:center;z-index:100;}
+  .modal{background:var(--card);border-radius:16px 16px 0 0;padding:16px;width:100%;max-width:640px;max-height:80vh;overflow-y:auto;}
+  .modal h3{margin:0 0 10px;font-size:16px;}
+  .hist-item{border:0.5px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;}
+  .hist-item .ts{font-size:11px;color:var(--text-muted);margin-bottom:4px;}
+  .hist-item button{margin-top:6px;font-size:11px;padding:5px 8px;border-radius:6px;border:0.5px solid var(--accent);background:var(--accent-bg);color:var(--accent);cursor:pointer;}
+  .modal-close{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:0.5px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;cursor:pointer;}
+
+  /* stats */
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .stat-card{background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;}
+  .stat-num{font-size:26px;font-weight:600;}
+  .stat-label{font-size:12px;color:var(--text-2);margin-top:2px;}
+
+  /* set list */
+  .setlist-item{background:var(--card);border:0.5px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+  .setlist-item .num{font-weight:600;color:var(--text-muted);font-size:13px;width:20px;}
+  .setlist-item .title{flex:1;font-size:14px;}
+  .setlist-item .time{font-size:11px;color:var(--text-muted);}
+  .time-group{display:flex;align-items:center;gap:4px;}
+  .time-input{width:56px;font-size:11px;padding:5px 6px;text-align:center;color:var(--text-muted);}
+  .time-input:not(:placeholder-shown){color:var(--text);}
+  .setlist-total{text-align:center;font-size:13px;color:var(--text-2);margin-bottom:10px;}
+
+  .export-btn{width:100%;padding:10px;border-radius:10px;border:0.5px solid var(--accent);background:var(--accent-bg);color:var(--accent);font-size:13px;cursor:pointer;margin:6px 0 14px;}
+  .backup-banner{font-size:12px;padding:8px 10px;border-radius:8px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .backup-ok{background:var(--grn-bg);color:var(--grn-tx);}
+  .backup-warn{background:var(--yel-bg);color:var(--yel-tx);}
+  .backup-none{background:var(--red-bg);color:var(--red-tx);}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🎤 JokeBoard</h1>
+    <div class="tabs">
+      <div class="tab active" data-tab="board">Board</div>
+      <div class="tab" data-tab="setlist">Set list</div>
+      <div class="tab" data-tab="stats">Stats</div>
+    </div>
+    <div id="board-controls">
+      <div id="backup-banner"></div>
+      <div class="searchrow">
+        <input type="search" id="search" placeholder="Search jokes…">
+        <button id="import-btn" style="width:auto;padding:9px 12px;font-size:12px;border-radius:8px;border:0.5px solid var(--border);background:var(--card);color:var(--text-2);cursor:pointer;white-space:nowrap;">Import</button>
+      </div>
+      <div class="filters" id="status-filters"></div>
+      <div class="filters" id="theme-filters" style="margin-top:6px;"></div>
+    </div>
+  </header>
+  <main id="main"></main>
+</div>
+<button class="fab" id="fab" title="Quick capture">+</button>
+<div id="modal-root"></div>
+
+<script>
+// ---------- storage helpers ----------
+const STORE_KEY = 'jokeboard-data';
+let DATA = { jokes: [], setListOrder: [], lastBackupAt: null };
+let loaded = false;
+
+function uid(){ return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function now(){ return new Date().toISOString(); }
+function fmtDate(iso){
+  try{
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  }catch(e){ return ''; }
+}
+
+async function loadData(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      DATA = JSON.parse(raw);
+      if(!DATA.jokes) DATA.jokes = [];
+      if(!DATA.setListOrder) DATA.setListOrder = [];
+      if(DATA.lastBackupAt === undefined) DATA.lastBackupAt = null;
+    }
+  }catch(e){
+    console.error('Load error', e);
+    DATA = { jokes: [], setListOrder: [], lastBackupAt: null };
+  }
+  loaded = true;
+}
+
+let saveTimeout = null;
+async function saveData(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(DATA));
+  }catch(e){
+    console.error('Storage error (device storage may be full)', e);
+    alert('Could not save — your device storage might be full. Export a backup soon.');
+  }
+}
+function saveDataDebounced(){
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(saveData, 400);
+}
+
+// ---------- app state ----------
+let currentTab = 'board';
+let searchTerm = '';
+let statusFilter = 'all';
+let themeFilter = 'all';
+let sortMode = 'recent'; // 'recent' | 'oldest'
+
+function newJoke(premiseText){
+  return {
+    id: uid(),
+    premise: premiseText || '',
+    theme: '',
+    status: 'red',
+    needsStageTest: false,
+    callbackOf: null,
+    beats: [],
+    cutBits: [],
+    performances: [],
+    createdAt: now(),
+    updatedAt: now()
+  };
+}
+function newBeat(type, text){
+  return { id: uid(), type: type, text: text || '', history: [] };
+}
+
+// ---------- rendering ----------
+function el(tag, attrs, children){
+  const e = document.createElement(tag);
+  if(attrs) for(const k in attrs){
+    if(k === 'class') e.className = attrs[k];
+    else if(k.startsWith('on')) e.addEventListener(k.slice(2), attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  }
+  if(children) (Array.isArray(children)?children:[children]).forEach(c=>{
+    if(c==null) return;
+    e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  });
+  return e;
+}
+
+function render(){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===currentTab));
+  document.getElementById('board-controls').style.display = currentTab==='board' ? '' : 'none';
+  if(currentTab==='board') renderBackupBanner();
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+  if(currentTab==='board') renderBoard(main);
+  else if(currentTab==='setlist') renderSetList(main);
+  else renderStats(main);
+  document.getElementById('fab').style.display = currentTab==='board' ? 'flex' : 'none';
+}
+
+const RATING_SCORE = {killed:2, okay:1, died:0};
+function perfScore(j){
+  const perfs = j.performances || [];
+  if(!perfs.length) return null;
+  return perfs.reduce((s,p)=>s+(RATING_SCORE[p.rating]||0),0) / perfs.length;
+}
+function scoreLabel(score){
+  if(score==null) return 'Untested';
+  if(score >= 1.5) return 'Killed';
+  if(score >= 0.75) return 'Okay';
+  return 'Died';
+}
+const STOPWORDS = new Set(['the','a','an','and','but','or','to','of','in','on','at','is','it','i','you','my','your','me','that','this','for','with','as','be','are','was','were','so','just','like','have','has','had','do','does','did','not','no','if','then','they','them','their','we','our','us','out','up','out','get','got']);
+function jokeFullText(j){ return [j.premise, ...(j.beats||[]).map(b=>b.text)].join(' '); }
+function tokenize(text){
+  return new Set(text.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w && !STOPWORDS.has(w) && w.length>2));
+}
+function similarity(a,b){
+  const ta = tokenize(jokeFullText(a)), tb = tokenize(jokeFullText(b));
+  if(!ta.size || !tb.size) return 0;
+  let inter = 0;
+  ta.forEach(w=>{ if(tb.has(w)) inter++; });
+  const union = new Set([...ta,...tb]).size;
+  return union ? inter/union : 0;
+}
+function findSimilar(j, threshold){
+  return DATA.jokes
+    .filter(o=>o.id!==j.id)
+    .map(o=>({joke:o, score: similarity(j,o)}))
+    .filter(x=>x.score >= (threshold==null?0.22:threshold))
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,3);
+}
+
+function getThemes(){
+  const s = new Set();
+  DATA.jokes.forEach(j=>{ if(j.theme) j.theme.split(',').map(t=>t.trim()).filter(Boolean).forEach(t=>s.add(t)); });
+  return Array.from(s).sort();
+}
+
+function renderFilters(){
+  const sf = document.getElementById('status-filters');
+  sf.innerHTML = '';
+  const statuses = [['all','All'],['red','Raw'],['yellow','Developing'],['green','Set-ready']];
+  statuses.forEach(([val,label])=>{
+    const c = el('div', {class:'chip'+(statusFilter===val?' active':''), onclick: ()=>{statusFilter=val; render();}}, label);
+    sf.appendChild(c);
+  });
+  const sortLabels = {recent:'↕ Recent first', oldest:'↕ Oldest untouched', best:'↕ Best rated first'};
+  const sortChip = el('div', {class:'chip', onclick: ()=>{
+    sortMode = sortMode==='recent' ? 'oldest' : sortMode==='oldest' ? 'best' : 'recent';
+    render();
+  }}, sortLabels[sortMode]);
+  sf.appendChild(sortChip);
+
+  const tf = document.getElementById('theme-filters');
+  tf.innerHTML = '';
+  const themes = getThemes();
+  if(themes.length){
+    tf.appendChild(el('div',{class:'chip'+(themeFilter==='all'?' active':''), onclick:()=>{themeFilter='all';render();}},'All themes'));
+    themes.forEach(t=>{
+      tf.appendChild(el('div',{class:'chip'+(themeFilter===t?' active':''), onclick:()=>{themeFilter=t;render();}}, t));
+    });
+  }
+}
+
+function filteredJokes(){
+  let list = DATA.jokes.slice();
+  if(statusFilter!=='all') list = list.filter(j=>j.status===statusFilter);
+  if(themeFilter!=='all') list = list.filter(j=> (j.theme||'').split(',').map(t=>t.trim()).includes(themeFilter));
+  if(searchTerm.trim()){
+    const q = searchTerm.toLowerCase();
+    list = list.filter(j=>{
+      const hay = [j.premise, j.theme, ...(j.beats||[]).map(b=>b.text)].join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  if(sortMode==='recent') list.sort((a,b)=> new Date(b.updatedAt) - new Date(a.updatedAt));
+  else if(sortMode==='oldest') list.sort((a,b)=> new Date(a.updatedAt) - new Date(b.updatedAt));
+  else list.sort((a,b)=> (perfScore(b) ?? -1) - (perfScore(a) ?? -1));
+  return list;
+}
+
+function renderBoard(main){
+  renderFilters();
+  const list = filteredJokes();
+  if(!list.length){
+    main.appendChild(el('div',{class:'empty'}, DATA.jokes.length ? 'No jokes match your filters.' : 'No jokes yet — tap + to add your first one.'));
+    return;
+  }
+  list.forEach(j=> main.appendChild(renderCard(j)));
+}
+
+function renderCard(j){
+  const card = el('div', {class:'card card-status-'+j.status});
+
+  // head
+  const premiseInput = el('textarea', {class:'premise-input', rows:'1', placeholder:'Premise / title…'});
+  premiseInput.value = j.premise;
+  premiseInput.style.resize = 'none';
+  premiseInput.addEventListener('input', ()=>{
+    j.premise = premiseInput.value; j.updatedAt = now(); saveDataDebounced();
+  });
+
+  const statusBtns = el('div',{class:'status-btns'});
+  ['red','yellow','green'].forEach(s=>{
+    statusBtns.appendChild(el('div',{
+      class:'status-dot '+s+(j.status===s?' selected':''),
+      onclick: ()=>{ j.status = s; j.updatedAt = now(); saveDataDebounced(); render(); }
+    }));
+  });
+
+  const themeInput = el('input',{type:'text', class:'theme-input', placeholder:'theme(s), comma separated'});
+  themeInput.value = j.theme;
+  themeInput.addEventListener('input', ()=>{ j.theme = themeInput.value; j.updatedAt = now(); saveDataDebounced(); });
+
+  const stageFlag = el('div',{class:'stage-flag'+(j.needsStageTest?' on':''), onclick:()=>{
+    j.needsStageTest = !j.needsStageTest; saveDataDebounced(); render();
+  }}, j.needsStageTest ? '🎯 Needs stage test' : 'Needs stage test?');
+
+  const score = perfScore(j);
+  const scoreBadge = score!=null ? el('div',{class:'stage-flag', style:'cursor:default;'}, '📊 '+scoreLabel(score)) : null;
+
+  const callbackSelect = el('select',{style:'flex:1;min-width:120px;font-size:12px;padding:5px 8px;'});
+  callbackSelect.appendChild(el('option',{value:''}, '— not a callback —'));
+  DATA.jokes.filter(o=>o.id!==j.id).forEach(o=>{
+    const opt = el('option',{value:o.id}, (o.premise||'(untitled)').slice(0,40));
+    if(j.callbackOf===o.id) opt.setAttribute('selected','selected');
+    callbackSelect.appendChild(opt);
+  });
+  callbackSelect.addEventListener('change', ()=>{
+    j.callbackOf = callbackSelect.value || null; j.updatedAt = now(); saveDataDebounced(); render();
+  });
+  const callbackRow = el('div',{class:'card-meta-row'},[
+    el('span',{style:'font-size:11px;color:var(--text-muted);white-space:nowrap;'},'🔁 Callback to:'),
+    callbackSelect
+  ]);
+
+  const metaRow = el('div',{class:'card-meta-row'}, [statusBtns, themeInput]);
+  const metaRow2 = el('div',{class:'card-meta-row'}, [stageFlag, scoreBadge]);
+  const head = el('div',{class:'card-head'}, [premiseInput, metaRow, metaRow2, callbackRow]);
+  card.appendChild(head);
+
+  // beats section
+  const beatsSection = el('div',{class:'section'});
+  beatsSection.appendChild(el('div',{class:'section-label'},'Turn & tags (reorder with arrows)'));
+  (j.beats||[]).forEach((b, idx)=>{
+    beatsSection.appendChild(renderBeat(j, b, idx));
+  });
+  const addRow = el('div',{class:'add-row'}, [
+    el('button',{onclick: ()=>{ j.beats.push(newBeat('turn')); j.updatedAt=now(); saveDataDebounced(); render(); }}, '+ Add turn'),
+    el('button',{onclick: ()=>{ j.beats.push(newBeat('tag')); j.updatedAt=now(); saveDataDebounced(); render(); }}, '+ Add tag')
+  ]);
+  beatsSection.appendChild(addRow);
+  card.appendChild(beatsSection);
+
+  // cut bits
+  if((j.cutBits||[]).length){
+    const cutSection = el('div',{class:'section'});
+    cutSection.appendChild(el('div',{class:'section-label'},'Cut bits'));
+    const bin = el('div',{class:'cutbin'});
+    j.cutBits.forEach(cb=>{
+      bin.appendChild(el('div',{class:'cutbin-item'},[
+        el('span',{},cb.text),
+        el('button',{class:'icon-btn', title:'Restore', onclick:()=>{
+          j.beats.push(newBeat('tag', cb.text));
+          j.cutBits = j.cutBits.filter(x=>x.id!==cb.id);
+          j.updatedAt=now(); saveDataDebounced(); render();
+        }},'↩'),
+        el('button',{class:'icon-btn', title:'Delete forever', onclick:()=>{
+          j.cutBits = j.cutBits.filter(x=>x.id!==cb.id);
+          saveDataDebounced(); render();
+        }},'✕')
+      ]));
+    });
+    cutSection.appendChild(bin);
+    card.appendChild(cutSection);
+  }
+
+  // performance log
+  card.appendChild(renderPerfSection(j));
+
+  // similar jokes
+  const similar = findSimilar(j);
+  if(similar.length){
+    const simSection = el('div',{class:'section'});
+    simSection.appendChild(el('div',{class:'section-label'},'Similar jokes'));
+    similar.forEach(s=>{
+      simSection.appendChild(el('div',{class:'cutbin-item', style:'cursor:pointer;', onclick:()=>{
+        searchTerm = (s.joke.premise||'').slice(0,30);
+        document.getElementById('search').value = searchTerm;
+        render();
+      }},[
+        el('span',{}, (s.joke.premise||'(untitled)') + '  ·  '+Math.round(s.score*100)+'% overlap')
+      ]));
+    });
+    card.appendChild(simSection);
+  }
+
+  // footer
+  const footer = el('div',{class:'card-footer'}, [
+    el('button',{onclick: ()=>{ exportSingleJoke(j); }},'Export'),
+    el('button',{class:'danger', onclick: ()=>{ confirmDeleteJoke(j); }},'Delete joke')
+  ]);
+  card.appendChild(footer);
+
+  return card;
+}
+
+function renderBeat(j, b, idx){
+  const ta = el('textarea',{placeholder: b.type==='turn' ? 'The turn / punchline…' : 'A tag / riff…'});
+  ta.value = b.text;
+  let lastVal = b.text;
+  ta.addEventListener('focus', ()=>{ lastVal = ta.value; });
+  ta.addEventListener('blur', ()=>{
+    if(ta.value !== lastVal && lastVal.trim()!==''){
+      b.history.push({text:lastVal, ts:now()});
+    }
+    b.text = ta.value; j.updatedAt = now(); saveDataDebounced();
+  });
+
+  const controls = el('div',{class:'beat-controls'});
+  controls.appendChild(el('div',{class:'beat-type-label'}, b.type));
+  const upBtn = el('button',{class:'icon-btn', title:'Move up', onclick:()=>{
+    if(idx>0){ const arr=j.beats; [arr[idx-1],arr[idx]]=[arr[idx],arr[idx-1]]; j.updatedAt=now(); saveDataDebounced(); render(); }
+  }},'↑');
+  const downBtn = el('button',{class:'icon-btn', title:'Move down', onclick:()=>{
+    const arr=j.beats;
+    if(idx<arr.length-1){ [arr[idx+1],arr[idx]]=[arr[idx],arr[idx+1]]; j.updatedAt=now(); saveDataDebounced(); render(); }
+  }},'↓');
+  const histBtn = el('button',{class:'icon-btn', title:'Version history', onclick:()=>{ showHistoryModal(j,b); }},'🕐');
+  const cutBtn = el('button',{class:'icon-btn', title:'Cut (move to bin)', onclick:()=>{
+    j.cutBits = j.cutBits || [];
+    j.cutBits.push({id:uid(), text: b.text, ts: now()});
+    j.beats = j.beats.filter(x=>x.id!==b.id);
+    j.updatedAt = now(); saveDataDebounced(); render();
+  }},'✂');
+  [upBtn, downBtn, histBtn, cutBtn].forEach(btn=>controls.appendChild(btn));
+
+  return el('div',{class:'beat'}, [ta, controls]);
+}
+
+function showHistoryModal(j, b){
+  const root = document.getElementById('modal-root');
+  const overlay = el('div',{class:'modal-overlay', onclick:(e)=>{ if(e.target===overlay) root.innerHTML=''; }});
+  const modal = el('div',{class:'modal'});
+  modal.appendChild(el('h3',{},'Version history'));
+  if(!b.history.length){
+    modal.appendChild(el('div',{class:'empty'},'No earlier versions yet — edits get saved here once you change this line.'));
+  } else {
+    b.history.slice().reverse().forEach(h=>{
+      const item = el('div',{class:'hist-item'});
+      item.appendChild(el('div',{class:'ts'}, fmtDate(h.ts)));
+      item.appendChild(el('div',{}, h.text));
+      item.appendChild(el('button',{onclick:()=>{
+        b.history.push({text:b.text, ts:now()});
+        b.text = h.text; j.updatedAt = now(); saveDataDebounced();
+        root.innerHTML=''; render();
+      }},'Restore this version'));
+      modal.appendChild(item);
+    });
+  }
+  modal.appendChild(el('button',{class:'modal-close', onclick:()=>{ root.innerHTML=''; }},'Close'));
+  overlay.appendChild(modal);
+  root.innerHTML = '';
+  root.appendChild(overlay);
+}
+
+function renderPerfSection(j){
+  const section = el('div',{class:'section'});
+  section.appendChild(el('div',{class:'section-label'},'Performance log'));
+  (j.performances||[]).slice().reverse().forEach(p=>{
+    const ratingClass = p.rating==='killed' ? 'rating-killed' : p.rating==='died' ? 'rating-died' : 'rating-okay';
+    const ratingLabel = p.rating==='killed' ? 'Killed' : p.rating==='died' ? 'Died' : 'Okay';
+    section.appendChild(el('div',{class:'perf-item'},[
+      el('div',{class:'row1'},[
+        el('span',{}, fmtDate(p.date) + (p.venue ? ' · '+p.venue : '')),
+        el('span',{class:'rating-badge '+ratingClass}, ratingLabel)
+      ]),
+      p.notes ? el('div',{}, p.notes) : null
+    ]));
+  });
+
+  const dateInput = el('input',{type:'date'});
+  dateInput.value = new Date().toISOString().slice(0,10);
+  const venueInput = el('input',{type:'text', placeholder:'Venue'});
+  const ratingSelect = el('select',{},[
+    el('option',{value:'killed'},'Killed'),
+    el('option',{value:'okay'},'Okay'),
+    el('option',{value:'died'},'Died')
+  ]);
+  const notesInput = el('input',{type:'text', placeholder:'What worked / what to cut'});
+  const errBox = el('div',{class:'error'});
+  const addBtn = el('button',{onclick:()=>{
+    if(!dateInput.value){
+      errBox.textContent = 'Pick a date first';
+      return;
+    }
+    errBox.textContent = '';
+    j.performances = j.performances || [];
+    j.performances.push({id:uid(), date:dateInput.value, venue:venueInput.value.trim(), rating:ratingSelect.value, notes:notesInput.value.trim()});
+    j.updatedAt = now(); saveDataDebounced(); render();
+  }},'Log a set');
+
+  const form = el('div',{class:'perf-form'},[
+    el('div',{class:'row'},[dateInput, venueInput]),
+    ratingSelect, notesInput, errBox, addBtn
+  ]);
+  section.appendChild(form);
+  return section;
+}
+
+function confirmDeleteJoke(j){
+  const root = document.getElementById('modal-root');
+  const overlay = el('div',{class:'modal-overlay', onclick:(e)=>{ if(e.target===overlay) root.innerHTML=''; }});
+  const modal = el('div',{class:'modal'});
+  modal.appendChild(el('h3',{},'Delete this joke?'));
+  modal.appendChild(el('div',{class:'empty'},'This removes the whole card, including its history and performance log. This cannot be undone here — export first if unsure.'));
+  modal.appendChild(el('button',{class:'modal-close', style:'color:var(--red-tx);border-color:var(--red-bd);', onclick:()=>{
+    DATA.jokes = DATA.jokes.filter(x=>x.id!==j.id);
+    DATA.setListOrder = DATA.setListOrder.filter(id=>id!==j.id);
+    saveData(); root.innerHTML=''; render();
+  }},'Delete permanently'));
+  modal.appendChild(el('button',{class:'modal-close', onclick:()=>{ root.innerHTML=''; }},'Cancel'));
+  overlay.appendChild(modal);
+  root.innerHTML=''; root.appendChild(overlay);
+}
+
+// ---------- set list ----------
+function estimateSeconds(j){
+  const text = [j.premise, ...(j.beats||[]).map(b=>b.text)].join(' ');
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.round(words / 130 * 60); // ~130 wpm spoken comedy pace
+}
+function effectiveSeconds(j){
+  return (j.timeOverrideSec != null && !isNaN(j.timeOverrideSec)) ? j.timeOverrideSec : estimateSeconds(j);
+}
+function fmtSeconds(s){
+  const m = Math.floor(s/60), sec = s%60;
+  return m>0 ? (m+'m '+sec+'s') : (sec+'s');
+}
+function parseTimeInput(str){
+  str = str.trim();
+  if(!str) return null;
+  let m = str.match(/^(\d+):(\d{1,2})$/);
+  if(m) return parseInt(m[1])*60 + parseInt(m[2]);
+  m = str.match(/^(\d+)\s*m(?:in)?\s*(\d+)?\s*s?$/i);
+  if(m) return parseInt(m[1])*60 + (m[2]?parseInt(m[2]):0);
+  m = str.match(/^(\d+)\s*s(?:ec)?$/i);
+  if(m) return parseInt(m[1]);
+  if(/^\d+$/.test(str)) return parseInt(str);
+  return null;
+}
+
+function callbackWarning(j, idx){
+  if(!j.callbackOf) return null;
+  const setup = DATA.jokes.find(x=>x.id===j.callbackOf);
+  if(!setup) return 'Its setup joke no longer exists.';
+  const setupIdx = DATA.setListOrder.indexOf(setup.id);
+  if(setupIdx === -1) return 'Callback to "'+(setup.premise||'untitled')+'" — but that setup isn\'t in this set.';
+  if(setupIdx > idx) return 'Callback to "'+(setup.premise||'untitled')+'" — but that setup comes later in the running order.';
+  return null;
+}
+function renderSetList(main){
+  if(!DATA.setListOrder.length){
+    DATA.setListOrder = DATA.jokes.filter(j=>j.status!=='red').map(j=>j.id);
+  }
+  DATA.setListOrder = DATA.setListOrder.filter(id => DATA.jokes.some(j=>j.id===id));
+  const unlisted = DATA.jokes.filter(j=> !DATA.setListOrder.includes(j.id));
+
+  let total = 0;
+  const list = el('div',{});
+  DATA.setListOrder.forEach((id, idx)=>{
+    const j = DATA.jokes.find(x=>x.id===id);
+    if(!j) return;
+    const secs = effectiveSeconds(j);
+    total += secs;
+    const isOverridden = j.timeOverrideSec != null && !isNaN(j.timeOverrideSec);
+    const timeInput = el('input',{type:'text', class:'time-input', placeholder: fmtSeconds(estimateSeconds(j))});
+    timeInput.value = isOverridden ? fmtSeconds(j.timeOverrideSec) : '';
+    timeInput.addEventListener('change', ()=>{
+      const parsed = parseTimeInput(timeInput.value);
+      if(parsed == null){
+        j.timeOverrideSec = null;
+        timeInput.value = '';
+      } else {
+        j.timeOverrideSec = parsed;
+      }
+      saveDataDebounced(); render();
+    });
+    const timeGroup = el('span',{class:'time-group'},[
+      timeInput,
+      isOverridden ? el('button',{class:'icon-btn', title:'Reset to auto estimate', onclick:()=>{
+        j.timeOverrideSec = null; saveDataDebounced(); render();
+      }},'↺') : null
+    ]);
+    const item = el('div',{class:'setlist-item'},[
+      el('span',{class:'num'}, (idx+1)+'.'),
+      el('span',{class:'title'}, j.premise || '(untitled)'),
+      timeGroup,
+      el('button',{class:'icon-btn', onclick:()=>{
+        if(idx>0){ const arr=DATA.setListOrder; [arr[idx-1],arr[idx]]=[arr[idx],arr[idx-1]]; saveDataDebounced(); render(); }
+      }},'↑'),
+      el('button',{class:'icon-btn', onclick:()=>{
+        const arr=DATA.setListOrder;
+        if(idx<arr.length-1){ [arr[idx+1],arr[idx]]=[arr[idx],arr[idx+1]]; saveDataDebounced(); render(); }
+      }},'↓'),
+      el('button',{class:'icon-btn', onclick:()=>{
+        DATA.setListOrder = DATA.setListOrder.filter(x=>x!==id);
+        saveDataDebounced(); render();
+      }},'✕')
+    ]);
+    list.appendChild(item);
+    const warning = callbackWarning(j, idx);
+    if(warning){
+      list.appendChild(el('div',{style:'font-size:11px;color:var(--red-tx);margin:-4px 0 8px 4px;'}, '⚠ '+warning));
+    }
+  });
+
+  main.appendChild(el('div',{class:'setlist-total'}, 'Total run time: ~'+fmtSeconds(total)));
+  main.appendChild(el('div',{class:'setlist-total', style:'margin-top:-8px;color:var(--text-muted);font-size:11px;'}, 'Tap a time to set your own (e.g. "1:30" or "90"). Leave blank for the word-count estimate.'));
+  if(DATA.setListOrder.length){
+    main.appendChild(el('button',{class:'export-btn', style:'margin-top:4px;', onclick: exportScript},'Export set list script (.txt)'));
+  }
+  main.appendChild(list);
+
+  if(unlisted.length){
+    main.appendChild(el('div',{class:'section-label', style:'margin-top:16px;'},'Add to set'));
+    unlisted.forEach(j=>{
+      main.appendChild(el('div',{class:'setlist-item'},[
+        el('span',{class:'title'}, j.premise || '(untitled)'),
+        el('button',{class:'icon-btn', onclick:()=>{
+          DATA.setListOrder.push(j.id); saveDataDebounced(); render();
+        }},'+')
+      ]));
+    });
+  }
+  if(!DATA.jokes.length){
+    main.appendChild(el('div',{class:'empty'},'No jokes yet — add some on the Board tab first.'));
+  }
+}
+
+// ---------- stats ----------
+function renderStats(main){
+  const total = DATA.jokes.length;
+  const red = DATA.jokes.filter(j=>j.status==='red').length;
+  const yellow = DATA.jokes.filter(j=>j.status==='yellow').length;
+  const green = DATA.jokes.filter(j=>j.status==='green').length;
+  const allPerfs = DATA.jokes.flatMap(j=>j.performances||[]);
+  const ratingScore = {killed:2, okay:1, died:0};
+  let avgLabel = '—';
+  if(allPerfs.length){
+    const avg = allPerfs.reduce((s,p)=>s+(ratingScore[p.rating]||0),0) / allPerfs.length;
+    avgLabel = avg >= 1.5 ? 'Killed' : avg >= 0.75 ? 'Okay' : 'Died';
+  }
+  const needsTest = DATA.jokes.filter(j=>j.needsStageTest).length;
+
+  const grid = el('div',{class:'stat-grid'},[
+    statCard(total, 'Total jokes'),
+    statCard(green, 'Set-ready'),
+    statCard(yellow, 'Developing'),
+    statCard(red, 'Raw'),
+    statCard(allPerfs.length, 'Times performed'),
+    statCard(avgLabel, 'Average result'),
+  ]);
+  main.appendChild(grid);
+  if(needsTest){
+    main.appendChild(el('div',{class:'empty'}, needsTest + ' joke'+(needsTest===1?'':'s')+' flagged as needing a stage test.'));
+  }
+
+  const rated = DATA.jokes.filter(j=>perfScore(j)!=null).sort((a,b)=>perfScore(b)-perfScore(a));
+  if(rated.length){
+    main.appendChild(el('div',{class:'section-label', style:'margin:6px 0 8px;'},'Top performers'));
+    rated.slice(0,5).forEach(j=>{
+      main.appendChild(el('div',{class:'cutbin-item'},[
+        el('span',{}, j.premise||'(untitled)'),
+        el('span',{class:'rating-badge '+(scoreLabel(perfScore(j))==='Killed'?'rating-killed':scoreLabel(perfScore(j))==='Okay'?'rating-okay':'rating-died')}, scoreLabel(perfScore(j)))
+      ]));
+    });
+  }
+
+  let brokenCallbacks = 0;
+  DATA.jokes.forEach(j=>{
+    if(j.callbackOf){
+      const idx = DATA.setListOrder.indexOf(j.id);
+      if(idx !== -1 && callbackWarning(j, idx)) brokenCallbacks++;
+    }
+  });
+  if(brokenCallbacks){
+    main.appendChild(el('div',{class:'empty'}, '⚠ '+brokenCallbacks+' callback'+(brokenCallbacks===1?'':'s')+' in your set list '+(brokenCallbacks===1?'is':'are')+' missing its setup — check the Set list tab.'));
+  }
+
+  main.appendChild(el('button',{class:'export-btn', onclick: exportAll},'Export full backup (JSON)'));
+
+  const fileInput = el('input',{type:'file', accept:'application/json', style:'display:none;'});
+  fileInput.addEventListener('change', ()=>{
+    const file = fileInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(!parsed.jokes){ throw new Error('Not a valid backup file'); }
+        if(confirm('This will replace everything currently on this device with the backup file. Continue?')){
+          DATA = parsed;
+          if(!DATA.setListOrder) DATA.setListOrder = [];
+          if(DATA.lastBackupAt === undefined) DATA.lastBackupAt = null;
+          saveData();
+          render();
+        }
+      }catch(e){
+        alert('Could not read that file — make sure it\'s a JokeBoard backup JSON.');
+      }
+    };
+    reader.readAsText(file);
+  });
+  main.appendChild(fileInput);
+  main.appendChild(el('button',{class:'export-btn', style:'border-color:var(--border);color:var(--text-2);background:var(--card);', onclick: ()=>{ fileInput.click(); }},'Restore from backup (JSON)'));
+}
+function statCard(num, label){
+  return el('div',{class:'stat-card'},[
+    el('div',{class:'stat-num'}, String(num)),
+    el('div',{class:'stat-label'}, label)
+  ]);
+}
+
+// ---------- export ----------
+function downloadText(filename, text){
+  const blob = new Blob([text], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function exportScript(){
+  let total = 0;
+  const body = [];
+  DATA.setListOrder.forEach((id, idx)=>{
+    const j = DATA.jokes.find(x=>x.id===id);
+    if(!j) return;
+    const secs = effectiveSeconds(j);
+    total += secs;
+    body.push((idx+1)+'. '+(j.premise||'(untitled)')+'  ['+fmtSeconds(secs)+']');
+    const w = callbackWarning(j, idx);
+    if(w) body.push('   ⚠ '+w);
+    (j.beats||[]).forEach(b=>{
+      body.push('   '+(b.type==='turn'?'Turn: ':'Tag: ')+b.text);
+    });
+    body.push('');
+  });
+  const header = [
+    'SET LIST — '+new Date().toLocaleDateString(),
+    'Total run time: ~'+fmtSeconds(total),
+    ''
+  ];
+  downloadText('setlist-script-'+new Date().toISOString().slice(0,10)+'.txt', header.concat(body).join('\n'));
+}
+function download(filename, text){
+  const blob = new Blob([text], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function exportAll(){
+  download('jokeboard-backup-'+new Date().toISOString().slice(0,10)+'.json', JSON.stringify(DATA, null, 2));
+  DATA.lastBackupAt = now();
+  saveData();
+  renderBackupBanner();
+}
+function daysSince(iso){
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+}
+function renderBackupBanner(){
+  const holder = document.getElementById('backup-banner');
+  if(!holder) return;
+  let cls, text;
+  if(!DATA.lastBackupAt){
+    cls = 'backup-none'; text = "⚠ You've never backed up. Tap to export now.";
+  } else {
+    const d = daysSince(DATA.lastBackupAt);
+    if(d < 7){ cls = 'backup-ok'; text = '✓ Backed up '+(d===0?'today':d+'d ago'); }
+    else { cls = 'backup-warn'; text = '⚠ Last backup was '+d+'d ago — tap to back up now'; }
+  }
+  holder.innerHTML = '';
+  holder.appendChild(el('div',{class:'backup-banner '+cls, onclick: exportAll},[
+    el('span',{}, text)
+  ]));
+}
+function exportSingleJoke(j){
+  download('joke-'+(j.premise||'untitled').slice(0,20).replace(/[^a-z0-9]+/gi,'-')+'.json', JSON.stringify(j, null, 2));
+}
+
+// ---------- quick capture ----------
+function quickCapture(){
+  const root = document.getElementById('modal-root');
+  const overlay = el('div',{class:'modal-overlay', onclick:(e)=>{ if(e.target===overlay) root.innerHTML=''; }});
+  const modal = el('div',{class:'modal'});
+  modal.appendChild(el('h3',{},'New raw idea'));
+  const ta = el('textarea',{placeholder:'Jot it down before you lose it…', rows:'4'});
+  const errBox = el('div',{class:'error'});
+  modal.appendChild(ta);
+  modal.appendChild(errBox);
+  modal.appendChild(el('button',{class:'modal-close', onclick:()=>{
+    if(!ta.value.trim()){ errBox.textContent = 'Write something first'; return; }
+    const j = newJoke(ta.value.trim());
+    DATA.jokes.unshift(j);
+    saveData();
+    root.innerHTML=''; currentTab='board'; statusFilter='all'; render();
+  }},'Add to board'));
+  modal.appendChild(el('button',{class:'modal-close', onclick:()=>{ root.innerHTML=''; }},'Cancel'));
+  overlay.appendChild(modal);
+  root.innerHTML=''; root.appendChild(overlay);
+}
+
+function bulkImport(){
+  const root = document.getElementById('modal-root');
+  const overlay = el('div',{class:'modal-overlay', onclick:(e)=>{ if(e.target===overlay) root.innerHTML=''; }});
+  const modal = el('div',{class:'modal'});
+  modal.appendChild(el('h3',{},'Import from notes'));
+  modal.appendChild(el('div',{class:'empty', style:'padding:0 0 10px;text-align:left;'},
+    'Copy your jokes from your notes app, paste them below, then choose how to split them up. Everything comes in as a raw (red) card — you can sharpen and re-tag from there.'));
+  const ta = el('textarea',{placeholder:'Paste your jokes here…', rows:'8'});
+  modal.appendChild(ta);
+
+  let splitMode = 'blank';
+  const modeRow = el('div',{class:'filters', style:'margin:10px 0;'});
+  const blankChip = el('div',{class:'chip active'},'Blank line = new joke');
+  const lineChip = el('div',{class:'chip'},'Every line = new joke');
+  blankChip.addEventListener('click', ()=>{ splitMode='blank'; blankChip.classList.add('active'); lineChip.classList.remove('active'); });
+  lineChip.addEventListener('click', ()=>{ splitMode='line'; lineChip.classList.add('active'); blankChip.classList.remove('active'); });
+  modeRow.appendChild(blankChip); modeRow.appendChild(lineChip);
+  modal.appendChild(modeRow);
+
+  const errBox = el('div',{class:'error'});
+  modal.appendChild(errBox);
+
+  const previewLabel = el('div',{class:'section-label', style:'margin-top:8px;'});
+  modal.appendChild(previewLabel);
+  function updatePreview(){
+    const chunks = splitText(ta.value, splitMode);
+    previewLabel.textContent = chunks.length ? ('Will import '+chunks.length+' joke'+(chunks.length===1?'':'s')+' as raw cards') : '';
+  }
+  ta.addEventListener('input', updatePreview);
+  blankChip.addEventListener('click', updatePreview);
+  lineChip.addEventListener('click', updatePreview);
+
+  modal.appendChild(el('button',{class:'modal-close', onclick:()=>{
+    const chunks = splitText(ta.value, splitMode);
+    if(!chunks.length){ errBox.textContent = 'Paste something first'; return; }
+    chunks.forEach(text=>{
+      const j = newJoke(text);
+      DATA.jokes.unshift(j);
+    });
+    saveData();
+    root.innerHTML=''; currentTab='board'; statusFilter='red'; render();
+  }},'Import all'));
+  modal.appendChild(el('button',{class:'modal-close', onclick:()=>{ root.innerHTML=''; }},'Cancel'));
+
+  overlay.appendChild(modal);
+  root.innerHTML=''; root.appendChild(overlay);
+}
+function splitText(text, mode){
+  if(mode==='blank'){
+    return text.split(/\n\s*\n+/).map(s=>s.trim()).filter(Boolean);
+  }
+  return text.split('\n').map(s=>s.trim()).filter(Boolean);
+}
+
+// ---------- init ----------
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{ currentTab = t.dataset.tab; render(); });
+});
+document.getElementById('search').addEventListener('input', (e)=>{ searchTerm = e.target.value; render(); });
+document.getElementById('fab').addEventListener('click', quickCapture);
+document.getElementById('import-btn').addEventListener('click', bulkImport);
+
+(async function init(){
+  document.getElementById('main').innerHTML = '<div class="empty">Loading your jokes…</div>';
+  await loadData();
+  render();
+})();
+</script>
+</body>
+</html>
