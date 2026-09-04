@@ -209,6 +209,7 @@ function newJoke(premiseText){
     theme: '',
     status: 'red',
     needsStageTest: false,
+    archived: false,
     callbackOf: null,
     beats: [],
     cutBits: [],
@@ -291,7 +292,7 @@ function getThemes(){
 function renderFilters(){
   const sf = document.getElementById('status-filters');
   sf.innerHTML = '';
-  const statuses = [['all','All'],['red','Raw'],['yellow','Developing'],['green','Set-ready']];
+  const statuses = [['all','All'],['red','Raw'],['yellow','Developing'],['green','Set-ready'],['archived','Archived']];
   statuses.forEach(([val,label])=>{
     const c = el('div', {class:'chip'+(statusFilter===val?' active':''), onclick: ()=>{statusFilter=val; render();}}, label);
     sf.appendChild(c);
@@ -316,7 +317,11 @@ function renderFilters(){
 
 function filteredJokes(){
   let list = DATA.jokes.slice();
-  if(statusFilter!=='all') list = list.filter(j=>j.status===statusFilter);
+  if(statusFilter==='archived') list = list.filter(j=>j.archived);
+  else {
+    list = list.filter(j=>!j.archived);
+    if(statusFilter!=='all') list = list.filter(j=>j.status===statusFilter);
+  }
   if(themeFilter!=='all') list = list.filter(j=> (j.theme||'').split(',').map(t=>t.trim()).includes(themeFilter));
   if(searchTerm.trim()){
     const q = searchTerm.toLowerCase();
@@ -450,6 +455,8 @@ function renderCard(j){
   // footer
   const footer = el('div',{class:'card-footer'}, [
     el('button',{onclick: ()=>{ exportSingleJoke(j); }},'Export'),
+    el('button',{onclick: ()=>{ showMergeModal(j); }},'Merge into…'),
+    el('button',{onclick: ()=>{ j.archived = !j.archived; j.updatedAt = now(); saveDataDebounced(); render(); }}, j.archived ? 'Unarchive' : 'Archive'),
     el('button',{class:'danger', onclick: ()=>{ confirmDeleteJoke(j); }},'Delete joke')
   ]);
   card.appendChild(footer);
@@ -479,15 +486,45 @@ function renderBeat(j, b, idx){
     if(idx<arr.length-1){ [arr[idx+1],arr[idx]]=[arr[idx],arr[idx+1]]; j.updatedAt=now(); saveDataDebounced(); render(); }
   }},'↓');
   const histBtn = el('button',{class:'icon-btn', title:'Version history', onclick:()=>{ showHistoryModal(j,b); }},'🕐');
+  const moveBtn = el('button',{class:'icon-btn', title:'Move to another joke', onclick:()=>{ showMoveBeatModal(j,b); }},'↪');
   const cutBtn = el('button',{class:'icon-btn', title:'Cut (move to bin)', onclick:()=>{
     j.cutBits = j.cutBits || [];
     j.cutBits.push({id:uid(), text: b.text, ts: now()});
     j.beats = j.beats.filter(x=>x.id!==b.id);
     j.updatedAt = now(); saveDataDebounced(); render();
   }},'✂');
-  [upBtn, downBtn, histBtn, cutBtn].forEach(btn=>controls.appendChild(btn));
+  [upBtn, downBtn, histBtn, moveBtn, cutBtn].forEach(btn=>controls.appendChild(btn));
 
   return el('div',{class:'beat'}, [ta, controls]);
+}
+
+function showMoveBeatModal(sourceJoke, beat){
+  const root = document.getElementById('modal-root');
+  const overlay = el('div',{class:'modal-overlay', onclick:(e)=>{ if(e.target===overlay) root.innerHTML=''; }});
+  const modal = el('div',{class:'modal'});
+  modal.appendChild(el('h3',{},'Move this line to another joke'));
+  const others = DATA.jokes.filter(o=>o.id!==sourceJoke.id);
+  if(!others.length){
+    modal.appendChild(el('div',{class:'empty'},'No other jokes to move it to yet.'));
+  } else {
+    modal.appendChild(el('div',{class:'empty', style:'padding:0 0 10px;text-align:left;'}, '"'+beat.text.slice(0,80)+'"'));
+    const select = el('select',{style:'width:100%;margin-bottom:10px;'});
+    others.forEach(o=>select.appendChild(el('option',{value:o.id}, (o.premise||'(untitled)').slice(0,50))));
+    modal.appendChild(select);
+    modal.appendChild(el('button',{class:'modal-close', onclick:()=>{
+      const target = DATA.jokes.find(x=>x.id===select.value);
+      if(target){
+        sourceJoke.beats = sourceJoke.beats.filter(x=>x.id!==beat.id);
+        target.beats.push(beat);
+        sourceJoke.updatedAt = now(); target.updatedAt = now();
+        saveData();
+      }
+      root.innerHTML=''; render();
+    }},'Move it'));
+  }
+  modal.appendChild(el('button',{class:'modal-close', onclick:()=>{ root.innerHTML=''; }},'Cancel'));
+  overlay.appendChild(modal);
+  root.innerHTML=''; root.appendChild(overlay);
 }
 
 function showHistoryModal(j, b){
@@ -560,6 +597,49 @@ function renderPerfSection(j){
   return section;
 }
 
+function showMergeModal(j){
+  const root = document.getElementById('modal-root');
+  const overlay = el('div',{class:'modal-overlay', onclick:(e)=>{ if(e.target===overlay) root.innerHTML=''; }});
+  const modal = el('div',{class:'modal'});
+  modal.appendChild(el('h3',{},'Merge into another card'));
+  const others = DATA.jokes.filter(o=>o.id!==j.id);
+  if(!others.length){
+    modal.appendChild(el('div',{class:'empty'},'No other jokes to merge into yet.'));
+  } else {
+    modal.appendChild(el('div',{class:'empty', style:'padding:0 0 10px;text-align:left;'},
+      'This card\'s beats, themes, and notes get folded into the one you pick below, then this card is deleted.'));
+    const select = el('select',{style:'width:100%;margin-bottom:10px;'});
+    others.forEach(o=>select.appendChild(el('option',{value:o.id}, (o.premise||'(untitled)').slice(0,50))));
+    modal.appendChild(select);
+    modal.appendChild(el('button',{class:'modal-close', onclick:()=>{
+      mergeJokes(j.id, select.value);
+      root.innerHTML=''; render();
+    }},'Merge'));
+  }
+  modal.appendChild(el('button',{class:'modal-close', onclick:()=>{ root.innerHTML=''; }},'Cancel'));
+  overlay.appendChild(modal);
+  root.innerHTML=''; root.appendChild(overlay);
+}
+function mergeJokes(sourceId, targetId){
+  const source = DATA.jokes.find(x=>x.id===sourceId);
+  const target = DATA.jokes.find(x=>x.id===targetId);
+  if(!source || !target) return;
+  if(!target.premise.trim()) target.premise = source.premise;
+  else if(source.premise.trim()) target.beats.unshift(newBeat('tag', source.premise));
+  target.beats = target.beats.concat(source.beats || []);
+  const themes = new Set([
+    ...(target.theme||'').split(',').map(t=>t.trim()).filter(Boolean),
+    ...(source.theme||'').split(',').map(t=>t.trim()).filter(Boolean)
+  ]);
+  target.theme = Array.from(themes).join(', ');
+  target.cutBits = (target.cutBits||[]).concat(source.cutBits||[]);
+  target.performances = (target.performances||[]).concat(source.performances||[]);
+  target.updatedAt = now();
+  DATA.jokes = DATA.jokes.filter(x=>x.id!==sourceId);
+  DATA.setListOrder = DATA.setListOrder.filter(id=>id!==sourceId);
+  saveData();
+}
+
 function confirmDeleteJoke(j){
   const root = document.getElementById('modal-root');
   const overlay = el('div',{class:'modal-overlay', onclick:(e)=>{ if(e.target===overlay) root.innerHTML=''; }});
@@ -613,10 +693,10 @@ function callbackWarning(j, idx){
 }
 function renderSetList(main){
   if(!DATA.setListOrder.length){
-    DATA.setListOrder = DATA.jokes.filter(j=>j.status!=='red').map(j=>j.id);
+    DATA.setListOrder = DATA.jokes.filter(j=>j.status!=='red' && !j.archived).map(j=>j.id);
   }
   DATA.setListOrder = DATA.setListOrder.filter(id => DATA.jokes.some(j=>j.id===id));
-  const unlisted = DATA.jokes.filter(j=> !DATA.setListOrder.includes(j.id));
+  const unlisted = DATA.jokes.filter(j=> !DATA.setListOrder.includes(j.id) && !j.archived);
 
   let total = 0;
   const list = el('div',{});
@@ -704,6 +784,7 @@ function renderStats(main){
     avgLabel = avg >= 1.5 ? 'Killed' : avg >= 0.75 ? 'Okay' : 'Died';
   }
   const needsTest = DATA.jokes.filter(j=>j.needsStageTest).length;
+  const archived = DATA.jokes.filter(j=>j.archived).length;
 
   const grid = el('div',{class:'stat-grid'},[
     statCard(total, 'Total jokes'),
@@ -712,6 +793,7 @@ function renderStats(main){
     statCard(red, 'Raw'),
     statCard(allPerfs.length, 'Times performed'),
     statCard(avgLabel, 'Average result'),
+    statCard(archived, 'Archived'),
   ]);
   main.appendChild(grid);
   if(needsTest){
@@ -865,20 +947,47 @@ function quickCapture(){
   root.innerHTML=''; root.appendChild(overlay);
 }
 
-function bulkImport(){
+function buildDefaultRows(text, mode){
+  const lines = text.split('\n');
+  const rows = [];
+  let lastNewId = null;
+  let sawBlank = true;
+  lines.forEach(raw=>{
+    const line = raw.trim();
+    if(!line){ sawBlank = true; return; }
+    const rowId = uid();
+    if(mode === 'line'){
+      rows.push({id: rowId, text: line, assignment: 'new'});
+      lastNewId = rowId;
+    } else {
+      if(sawBlank || lastNewId===null){
+        rows.push({id: rowId, text: line, assignment: 'new'});
+        lastNewId = rowId;
+      } else {
+        rows.push({id: rowId, text: line, assignment: lastNewId});
+      }
+      sawBlank = false;
+    }
+  });
+  return rows;
+}
+
+function bulkImport(){ importStep1(); }
+
+function importStep1(){
   const root = document.getElementById('modal-root');
   const overlay = el('div',{class:'modal-overlay', onclick:(e)=>{ if(e.target===overlay) root.innerHTML=''; }});
   const modal = el('div',{class:'modal'});
   modal.appendChild(el('h3',{},'Import from notes'));
   modal.appendChild(el('div',{class:'empty', style:'padding:0 0 10px;text-align:left;'},
-    'Copy your jokes from your notes app, paste them below, then choose how to split them up. Everything comes in as a raw (red) card — you can sharpen and re-tag from there.'));
+    'Paste your jokes below. Next, you\'ll check every line and confirm which are titles and which are notes underneath them — nothing gets added until you approve it.'));
   const ta = el('textarea',{placeholder:'Paste your jokes here…', rows:'8'});
   modal.appendChild(ta);
 
   let splitMode = 'blank';
   const modeRow = el('div',{class:'filters', style:'margin:10px 0;'});
-  const blankChip = el('div',{class:'chip active'},'Blank line = new joke');
-  const lineChip = el('div',{class:'chip'},'Every line = new joke');
+  const blankChip = el('div',{class:'chip active'},'Starting guess: blank line = new joke');
+  const lineChip = el('div',{class:'chip'},'Starting guess: every line = new joke');
   blankChip.addEventListener('click', ()=>{ splitMode='blank'; blankChip.classList.add('active'); lineChip.classList.remove('active'); });
   lineChip.addEventListener('click', ()=>{ splitMode='line'; lineChip.classList.add('active'); blankChip.classList.remove('active'); });
   modeRow.appendChild(blankChip); modeRow.appendChild(lineChip);
@@ -887,36 +996,87 @@ function bulkImport(){
   const errBox = el('div',{class:'error'});
   modal.appendChild(errBox);
 
-  const previewLabel = el('div',{class:'section-label', style:'margin-top:8px;'});
-  modal.appendChild(previewLabel);
-  function updatePreview(){
-    const chunks = splitText(ta.value, splitMode);
-    previewLabel.textContent = chunks.length ? ('Will import '+chunks.length+' joke'+(chunks.length===1?'':'s')+' as raw cards') : '';
-  }
-  ta.addEventListener('input', updatePreview);
-  blankChip.addEventListener('click', updatePreview);
-  lineChip.addEventListener('click', updatePreview);
-
   modal.appendChild(el('button',{class:'modal-close', onclick:()=>{
-    const chunks = splitText(ta.value, splitMode);
-    if(!chunks.length){ errBox.textContent = 'Paste something first'; return; }
-    chunks.forEach(text=>{
-      const j = newJoke(text);
-      DATA.jokes.unshift(j);
-    });
-    saveData();
-    root.innerHTML=''; currentTab='board'; statusFilter='red'; render();
-  }},'Import all'));
+    if(!ta.value.trim()){ errBox.textContent = 'Paste something first'; return; }
+    const rows = buildDefaultRows(ta.value, splitMode);
+    if(!rows.length){ errBox.textContent = 'Paste something first'; return; }
+    importStep2(rows);
+  }},'Next: review lines →'));
   modal.appendChild(el('button',{class:'modal-close', onclick:()=>{ root.innerHTML=''; }},'Cancel'));
 
   overlay.appendChild(modal);
   root.innerHTML=''; root.appendChild(overlay);
 }
-function splitText(text, mode){
-  if(mode==='blank'){
-    return text.split(/\n\s*\n+/).map(s=>s.trim()).filter(Boolean);
+
+function importStep2(rows){
+  const root = document.getElementById('modal-root');
+  function renderStep2(){
+    const overlay = el('div',{class:'modal-overlay'});
+    const modal = el('div',{class:'modal'});
+    modal.appendChild(el('h3',{},'Check each line'));
+    modal.appendChild(el('div',{class:'empty', style:'padding:0 0 8px;text-align:left;'},
+      'Reorder lines with the arrows if needed, and fix any title/note guess before importing.'));
+    rows.forEach((row, idx)=>{
+      const rowEl = el('div',{style:'border:0.5px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px;'});
+      const topLine = el('div',{style:'display:flex;gap:6px;align-items:flex-start;'});
+      topLine.appendChild(el('div',{style:'font-size:13px;flex:1;'}, row.text));
+      const arrows = el('div',{style:'display:flex;flex-direction:column;gap:3px;'});
+      arrows.appendChild(el('button',{class:'icon-btn', title:'Move up', onclick:()=>{
+        if(idx>0){ [rows[idx-1],rows[idx]]=[rows[idx],rows[idx-1]]; renderStep2(); }
+      }},'↑'));
+      arrows.appendChild(el('button',{class:'icon-btn', title:'Move down', onclick:()=>{
+        if(idx<rows.length-1){ [rows[idx+1],rows[idx]]=[rows[idx],rows[idx+1]]; renderStep2(); }
+      }},'↓'));
+      topLine.appendChild(arrows);
+      rowEl.appendChild(topLine);
+
+      const select = el('select',{style:'width:100%;font-size:12px;padding:6px;margin-top:6px;'});
+      select.appendChild(el('option',{value:'new'},'🆕 New joke (title)'));
+      rows.forEach((other)=>{
+        if(other.id===row.id || other.assignment!=='new') return;
+        select.appendChild(el('option',{value:other.id}, '↳ Note under: '+other.text.slice(0,30)));
+      });
+      select.value = row.assignment;
+      select.addEventListener('change', ()=>{
+        row.assignment = select.value;
+        renderStep2();
+      });
+      rowEl.appendChild(select);
+      modal.appendChild(rowEl);
+    });
+    modal.appendChild(el('button',{class:'modal-close', onclick:()=>{
+      commitImport(rows);
+      root.innerHTML=''; currentTab='board'; statusFilter='red'; render();
+    }},'Import all'));
+    modal.appendChild(el('button',{class:'modal-close', onclick:()=>{ importStep1(); }},'← Back'));
+    modal.appendChild(el('button',{class:'modal-close', onclick:()=>{ root.innerHTML=''; }},'Cancel'));
+    overlay.appendChild(modal);
+    root.innerHTML=''; root.appendChild(overlay);
   }
-  return text.split('\n').map(s=>s.trim()).filter(Boolean);
+  renderStep2();
+}
+
+function commitImport(rows){
+  const jokeByRowId = {};
+  rows.forEach((row)=>{
+    if(row.assignment === 'new'){
+      const j = newJoke(row.text);
+      jokeByRowId[row.id] = j;
+      DATA.jokes.push(j);
+    }
+  });
+  const beatCounter = {};
+  rows.forEach((row)=>{
+    if(row.assignment !== 'new'){
+      const targetJoke = jokeByRowId[row.assignment];
+      if(targetJoke){
+        const c = beatCounter[row.assignment] || 0;
+        targetJoke.beats.push(newBeat(c===0 ? 'turn' : 'tag', row.text));
+        beatCounter[row.assignment] = c + 1;
+      }
+    }
+  });
+  saveData();
 }
 
 // ---------- init ----------
