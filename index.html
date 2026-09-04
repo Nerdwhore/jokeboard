@@ -1011,6 +1011,8 @@ function importStep1(){
 function importStep2(rows){
   const root = document.getElementById('modal-root');
   function renderStep2(){
+    const prevModal = root.querySelector('.modal');
+    const scrollPos = prevModal ? prevModal.scrollTop : 0;
     const overlay = el('div',{class:'modal-overlay'});
     const modal = el('div',{class:'modal'});
     modal.appendChild(el('h3',{},'Check each line'));
@@ -1052,6 +1054,7 @@ function importStep2(rows){
     modal.appendChild(el('button',{class:'modal-close', onclick:()=>{ root.innerHTML=''; }},'Cancel'));
     overlay.appendChild(modal);
     root.innerHTML=''; root.appendChild(overlay);
+    modal.scrollTop = scrollPos;
   }
   renderStep2();
 }
